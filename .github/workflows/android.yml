@@ -9,35 +9,49 @@ on:
 jobs:
   build:
     runs-on: ubuntu-24.04
+    timeout-minutes: 40
     permissions:
       contents: read
 
     steps:
-      - name: Checkout
+      - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Setup Java
+      - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Install Android SDK
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools'
+
+      - name: Install Android API 35
         run: |
+          command -v sdkmanager
           sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
 
-      - name: Setup Gradle
+      - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
 
-      - name: Extract source
+      - name: Extract source ZIP
+        shell: bash
         run: |
-          ZIP=$(find . -maxdepth 1 -name '*.zip' | head -1)
-          if [ -n "$ZIP" ]; then
+          set -euo pipefail
+          if [ ! -f app/build.gradle ]; then
+            ZIP=$(find . -maxdepth 1 -type f -iname '*TedeAr*zip' -print -quit)
+            if [ -z "$ZIP" ]; then
+              echo 'Source ZIP not found'
+              exit 1
+            fi
             unzip -qo "$ZIP" -d .
           fi
           test -f app/build.gradle
+          test -f settings.gradle
 
       - name: Build APK
         run: gradle --no-daemon --stacktrace :app:assembleDebug
@@ -47,3 +61,4 @@ jobs:
         with:
           name: TedeAr-Sports-Remote-V3-APK
           path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
